@@ -1,6 +1,5 @@
 from functools import lru_cache
-
-from transformers import pipeline
+import os
 
 
 NEGATIVE_EMOTION_WORDS = {
@@ -31,10 +30,17 @@ POSITIVE_EMOTION_WORDS = {
 
 class SentimentService:
     def __init__(self) -> None:
-        self.classifier = pipeline(
-            "sentiment-analysis",
-            model="distilbert-base-uncased-finetuned-sst-2-english",
-        )
+        self.classifier = None
+        if os.getenv("AI_LIGHTWEIGHT_MODE", "0").lower() not in {"1", "true", "yes", "on"}:
+            try:
+                from transformers import pipeline
+
+                self.classifier = pipeline(
+                    "sentiment-analysis",
+                    model="distilbert-base-uncased-finetuned-sst-2-english",
+                )
+            except Exception:
+                self.classifier = None
 
     def analyze(self, text: str) -> str:
         normalized = text.lower().strip()
@@ -48,6 +54,9 @@ class SentimentService:
 
         if tokens & POSITIVE_EMOTION_WORDS:
             return "positive"
+
+        if self.classifier is None:
+            return "neutral"
 
         result = self.classifier(text[:512])[0]
         label = str(result.get("label", "NEUTRAL")).lower()

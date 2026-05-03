@@ -1,26 +1,38 @@
 import base64
 import contextlib
+import importlib
+import os
 import tempfile
 import wave
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from gtts import gTTS
-import pyttsx3
-from vosk import KaldiRecognizer, Model
-
 
 class SpeechService:
     def __init__(self, vosk_model_path: Optional[str] = None) -> None:
-        self.tts_engine = pyttsx3.init()
+        self.tts_engine = None
         self.vosk_model = None
-        if vosk_model_path:
+        if os.getenv("AI_LIGHTWEIGHT_MODE", "0").lower() not in {"1", "true", "yes", "on"}:
+            try:
+                pyttsx3 = importlib.import_module("pyttsx3")
+                self.tts_engine = pyttsx3.init()
+            except Exception:
+                self.tts_engine = None
+
+        if vosk_model_path and os.getenv("AI_LIGHTWEIGHT_MODE", "0").lower() not in {"1", "true", "yes", "on"}:
             model_path = Path(vosk_model_path)
             if model_path.exists():
-                self.vosk_model = Model(str(model_path))
+                try:
+                    vosk = importlib.import_module("vosk")
+                    self.vosk_model = vosk.Model(str(model_path))
+                except Exception:
+                    self.vosk_model = None
 
     def _synthesize_with_pyttsx3(self, text: str) -> tuple[str, str]:
+        if self.tts_engine is None:
+            return self._synthesize_with_gtts(text, "en")
+
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
             wav_path = temp_file.name
 
@@ -34,10 +46,12 @@ class SpeechService:
         return audio_b64, "audio/wav"
 
     def _synthesize_with_gtts(self, text: str, language: str) -> tuple[str, str]:
+        gtts = importlib.import_module("gtts")
+
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_file:
             mp3_path = temp_file.name
 
-        tts = gTTS(text=text, lang=language, slow=False)
+        tts = gtts.gTTS(text=text, lang=language, slow=False)
         tts.save(mp3_path)
 
         with open(mp3_path, "rb") as audio_file:
@@ -62,6 +76,8 @@ class SpeechService:
         if self.vosk_model is None:
             raise RuntimeError("Vosk model is not configured on server.")
 
+        vosk = importlib.import_module("vosk")
+
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
             temp_file.write(wav_bytes)
             wav_path = temp_file.name
@@ -70,7 +86,7 @@ class SpeechService:
             if wav_file.getnchannels() != 1:
                 raise RuntimeError("Audio must be mono WAV for Vosk.")
 
-            recognizer = KaldiRecognizer(self.vosk_model, wav_file.getframerate())
+            recognizer = vosk.KaldiRecognizer(self.vosk_model, wav_file.getframerate())
             while True:
                 chunk = wav_file.readframes(4000)
                 if len(chunk) == 0:

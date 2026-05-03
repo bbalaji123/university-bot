@@ -1,21 +1,24 @@
 from functools import lru_cache
+import os
 from typing import List
 import hashlib
 import re
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 
 class EmbeddingModel:
     def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
         self.model = None
         self.fallback_dim = 512
-        try:
-            self.model = SentenceTransformer(model_name)
-        except Exception:
-            # Offline-safe fallback: deterministic hashing embeddings.
-            self.model = None
+        if os.getenv("AI_LIGHTWEIGHT_MODE", "0").lower() not in {"1", "true", "yes", "on"}:
+            try:
+                from sentence_transformers import SentenceTransformer
+
+                self.model = SentenceTransformer(model_name)
+            except Exception:
+                # Offline-safe fallback: deterministic hashing embeddings.
+                self.model = None
 
     def _fallback_encode(self, texts: List[str]) -> np.ndarray:
         vectors = np.zeros((len(texts), self.fallback_dim), dtype="float32")

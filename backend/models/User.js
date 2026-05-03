@@ -12,7 +12,7 @@ const userSchema = new mongoose.Schema({
   // Basic Info
   firstName: { type: String, required: true, trim: true },
   lastName: { type: String, required: true, trim: true },
-  // Email removed; use studentId for login identity
+  email: { type: String, trim: true, lowercase: true },
   password: { type: String, required: true, minlength: 6 },
   
   // Student Specific
@@ -27,7 +27,9 @@ const userSchema = new mongoose.Schema({
   adminId: { type: String, unique: true, sparse: true },
   program: { type: String, enum: ['Computer Science', 'Business', 'Engineering', 'Arts', 'Science'] },
   year: { type: Number, min: 1, max: 6 },
+  section: { type: String, trim: true, uppercase: true },
   gpa: { type: Number, min: 0.0, max: 10.0 },
+  mobileNumber: { type: String, trim: true },
   role: { type: String, enum: ['student', 'admin'], default: 'student' },
   
   // Preferences & Settings
@@ -186,6 +188,13 @@ const supportTicketSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   subject: { type: String, required: true, maxlength: 200 },
   description: { type: String, required: true, maxlength: 2000 },
+  source: {
+    type: String,
+    enum: ['general', 'chatbot'],
+    default: 'general'
+  },
+  studentQuestion: { type: String, maxlength: 2000 },
+  language: { type: String, default: 'en' },
   
   // Categorization & Priority
   category: { 
@@ -208,6 +217,11 @@ const supportTicketSchema = new mongoose.Schema({
   assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Support staff
   resolution: String,
   resolutionTime: Number, // Time to resolve in hours
+  adminAnswer: { type: String, maxlength: 4000 },
+  answeredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  answeredAt: Date,
+  studentNotified: { type: Boolean, default: false },
+  studentRead: { type: Boolean, default: false },
   
   // Communication
   messages: [{
@@ -221,6 +235,35 @@ const supportTicketSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   resolvedAt: Date
+});
+
+// ========================================
+// 👍👎 CHAT FEEDBACK MODELS
+// ========================================
+// Purpose: Store per-response feedback and aggregated downvote alerts
+const chatResponseFeedbackSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  responseId: { type: String, required: true, trim: true },
+  question: { type: String, required: true, maxlength: 2000 },
+  normalizedQuestion: { type: String, required: true, maxlength: 2000 },
+  reply: { type: String, required: true, maxlength: 4000 },
+  vote: { type: String, enum: ['up', 'down'], required: true },
+  language: { type: String, default: 'en' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const chatFeedbackSummarySchema = new mongoose.Schema({
+  normalizedQuestion: { type: String, required: true, unique: true, maxlength: 2000 },
+  sampleQuestion: { type: String, required: true, maxlength: 2000 },
+  sampleReply: { type: String, maxlength: 4000 },
+  thumbsUpCount: { type: Number, default: 0 },
+  thumbsDownCount: { type: Number, default: 0 },
+  alertSent: { type: Boolean, default: false },
+  alertTicketId: { type: mongoose.Schema.Types.ObjectId, ref: 'SupportTicket' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  lastSeenAt: { type: Date, default: Date.now }
 });
 
 // ========================================
@@ -402,7 +445,11 @@ faqSchema.index({ keywords: 1 });
 moduleSchema.index({ moduleId: 1 });
 socialPostSchema.index({ userId: 1, createdAt: -1 });
 supportTicketSchema.index({ userId: 1, status: 1 });
+supportTicketSchema.index({ source: 1, status: 1, submittedAt: -1 });
 supportTicketSchema.index({ category: 1, priority: 1 });
+chatResponseFeedbackSchema.index({ userId: 1, responseId: 1 }, { unique: true });
+chatResponseFeedbackSchema.index({ normalizedQuestion: 1, vote: 1, updatedAt: -1 });
+chatFeedbackSummarySchema.index({ thumbsDownCount: -1, updatedAt: -1 });
 admissionApplicationSchema.index({ userId: 1, submittedAt: -1 });
 academicRegistrationSchema.index({ userId: 1, submittedAt: -1 });
 financialScholarshipSchema.index({ userId: 1, submittedAt: -1 });
@@ -424,6 +471,8 @@ const Module = mongoose.model('Module', moduleSchema);
 const FAQ = mongoose.model('FAQ', faqSchema);
 const SocialPost = mongoose.model('SocialPost', socialPostSchema);
 const SupportTicket = mongoose.model('SupportTicket', supportTicketSchema);
+const ChatResponseFeedback = mongoose.model('ChatResponseFeedback', chatResponseFeedbackSchema);
+const ChatFeedbackSummary = mongoose.model('ChatFeedbackSummary', chatFeedbackSummarySchema);
 const AdmissionApplication = mongoose.model('AdmissionApplication', admissionApplicationSchema);
 const AcademicRegistration = mongoose.model('AcademicRegistration', academicRegistrationSchema);
 const FinancialScholarshipApplication = mongoose.model('FinancialScholarshipApplication', financialScholarshipSchema);
@@ -443,6 +492,8 @@ module.exports = {
   FAQ,
   SocialPost,
   SupportTicket,
+  ChatResponseFeedback,
+  ChatFeedbackSummary,
   AdmissionApplication,
   AcademicRegistration,
   FinancialScholarshipApplication,

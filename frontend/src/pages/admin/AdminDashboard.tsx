@@ -1,17 +1,27 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded'
+import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded'
+import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded'
+import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded'
+import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded'
+import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
+import WorkRoundedIcon from '@mui/icons-material/WorkRounded'
+import ShareRoundedIcon from '@mui/icons-material/ShareRounded'
+import QuizRoundedIcon from '@mui/icons-material/QuizRounded'
+import GroupRoundedIcon from '@mui/icons-material/GroupRounded'
 import {
-  ClipboardCheck,
-  GraduationCap,
-  BookOpen,
-  DollarSign,
-  Building,
-  Heart,
-  Briefcase,
-  Share2,
-  HelpCircle,
-  Users
-} from 'lucide-react'
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Divider,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
 import Modal from '../../components/Modal'
 
 const ADMIN_MODULES = [
@@ -19,67 +29,73 @@ const ADMIN_MODULES = [
     id: 'admission',
     title: 'Admissions',
     description: 'Approve applications, update program info, and review eligibility data.',
-    icon: GraduationCap,
-    accent: 'bg-blue-500'
+    icon: SchoolRoundedIcon,
+    accent: '#0369a1',
   },
   {
     id: 'academic',
     title: 'Academics',
     description: 'Manage course registrations, calendars, and academic resources.',
-    icon: BookOpen,
-    accent: 'bg-emerald-500'
+    icon: MenuBookRoundedIcon,
+    accent: '#047857',
   },
   {
     id: 'financial',
     title: 'Financial Aid',
     description: 'Control scholarships, payment plans, and student financial requests.',
-    icon: DollarSign,
-    accent: 'bg-amber-500'
+    icon: AccountBalanceWalletRoundedIcon,
+    accent: '#b45309',
   },
   {
     id: 'campus',
     title: 'Campus Services',
     description: 'Oversee hostel applications, transport updates, and campus requests.',
-    icon: Building,
-    accent: 'bg-violet-500'
+    icon: ApartmentRoundedIcon,
+    accent: '#7c3aed',
   },
   {
     id: 'mental-health',
     title: 'Wellbeing',
     description: 'Coordinate counseling requests and resource access approvals.',
-    icon: Heart,
-    accent: 'bg-rose-500'
+    icon: FavoriteRoundedIcon,
+    accent: '#be123c',
   },
   {
     id: 'career',
     title: 'Career Support',
     description: 'Track resume reviews, mock interviews, and internship pipelines.',
-    icon: Briefcase,
-    accent: 'bg-indigo-500'
+    icon: WorkRoundedIcon,
+    accent: '#3730a3',
   },
   {
     id: 'social-media',
     title: 'Social Media',
     description: 'Schedule announcements and moderate student-facing posts.',
-    icon: Share2,
-    accent: 'bg-sky-500'
+    icon: ShareRoundedIcon,
+    accent: '#0369a1',
   },
   {
     id: 'ai-faqs',
     title: 'AI FAQs',
     description: 'Curate AI-generated FAQs and publish verified answers.',
-    icon: HelpCircle,
-    accent: 'bg-slate-600'
-  }
+    icon: QuizRoundedIcon,
+    accent: '#334155',
+  },
 ]
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate()
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
   const [showStudents, setShowStudents] = useState(false)
+  const [showChatbotQuestions, setShowChatbotQuestions] = useState(false)
   const [students, setStudents] = useState<any[]>([])
   const [studentsLoading, setStudentsLoading] = useState(false)
   const [studentsError, setStudentsError] = useState('')
+  const [chatbotQuestions, setChatbotQuestions] = useState<any[]>([])
+  const [chatbotLoading, setChatbotLoading] = useState(false)
+  const [chatbotError, setChatbotError] = useState('')
+  const [answerDrafts, setAnswerDrafts] = useState<Record<string, string>>({})
+  const [answerSavingId, setAnswerSavingId] = useState('')
 
   const loadStudents = async () => {
     const token = localStorage.getItem('token')
@@ -89,7 +105,7 @@ const AdminDashboard: React.FC = () => {
       setStudentsLoading(true)
       setStudentsError('')
       const response = await fetch(`${apiBaseUrl}/admin/students?status=active`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!response.ok) {
@@ -98,7 +114,7 @@ const AdminDashboard: React.FC = () => {
 
       const data = await response.json()
       setStudents(data.students || [])
-    } catch (error) {
+    } catch {
       setStudentsError('Unable to load active students')
     } finally {
       setStudentsLoading(false)
@@ -110,6 +126,70 @@ const AdminDashboard: React.FC = () => {
     loadStudents()
   }
 
+  const loadChatbotQuestions = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    try {
+      setChatbotLoading(true)
+      setChatbotError('')
+      const response = await fetch(`${apiBaseUrl}/admin/chatbot-questions?status=pending`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to load chatbot questions')
+      }
+
+      const data = await response.json()
+      setChatbotQuestions(data.questions || [])
+    } catch {
+      setChatbotError('Unable to load pending chatbot questions')
+    } finally {
+      setChatbotLoading(false)
+    }
+  }
+
+  const openChatbotQuestionsModal = () => {
+    setShowChatbotQuestions(true)
+    loadChatbotQuestions()
+  }
+
+  const publishChatbotAnswer = async (questionId: string) => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    const answer = (answerDrafts[questionId] || '').trim()
+    if (!answer) {
+      setChatbotError('Answer is required before publishing')
+      return
+    }
+
+    try {
+      setAnswerSavingId(questionId)
+      setChatbotError('')
+      const response = await fetch(`${apiBaseUrl}/admin/chatbot-questions/${questionId}/answer`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ answer }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to publish answer')
+      }
+
+      setAnswerDrafts((prev) => ({ ...prev, [questionId]: '' }))
+      setChatbotQuestions((prev) => prev.filter((item) => item.id !== questionId))
+    } catch {
+      setChatbotError('Unable to publish answer right now')
+    } finally {
+      setAnswerSavingId('')
+    }
+  }
+
   const toggleStudentStatus = async (studentId: string, isActive: boolean) => {
     const token = localStorage.getItem('token')
     if (!token) return
@@ -119,120 +199,185 @@ const AdminDashboard: React.FC = () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ isActive })
+        body: JSON.stringify({ isActive }),
       })
 
       if (!response.ok) {
         throw new Error('Failed to update student')
       }
 
-      setStudents((prev) => prev.map((student) => (
-        student._id === studentId ? { ...student, isActive } : student
-      )))
-    } catch (error) {
+      setStudents((prev) => prev.map((student) => (student._id === studentId ? { ...student, isActive } : student)))
+    } catch {
       setStudentsError('Unable to update student status')
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-6 py-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-gray-900">Admin Control Center</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Monitor student activity, approve requests, and manage every support module.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={openStudentsModal}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm"
-            >
-              <Users className="h-4 w-4" />
-              View active students
-            </button>
-            <button
-              onClick={() => navigate('/admin/modules?status=pending')}
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white"
-            >
-              <ClipboardCheck className="h-4 w-4" />
-              Review pending approvals
-            </button>
-          </div>
-        </div>
+    <Stack spacing={2.5}>
+      <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between" spacing={1.5}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            Admin Control Center
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.6 }}>
+            Monitor student activity, approve requests, and manage every support module.
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" startIcon={<GroupRoundedIcon />} onClick={openStudentsModal}>
+            View active students
+          </Button>
+          <Button variant="outlined" onClick={openChatbotQuestionsModal}>
+            Unanswered chatbot questions
+          </Button>
+          <Button variant="contained" startIcon={<FactCheckRoundedIcon />} onClick={() => navigate('/admin/modules?status=pending')}>
+            Review pending approvals
+          </Button>
+        </Stack>
+      </Stack>
 
-        <div className="mt-10">
-          <h2 className="text-xl font-semibold text-gray-900">Manage modules</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Each module controls the data students see and the requests they submit.
-          </p>
+      <Box>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          Manage modules
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
+          Each module controls the data students see and the requests they submit.
+        </Typography>
 
-          <div className="mt-6 grid gap-5 md:grid-cols-2">
-            {ADMIN_MODULES.map((module) => {
-              const Icon = module.icon
-              return (
-                <Link
-                  key={module.id}
-                  to={`/admin/${module.id}`}
-                  className="group rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className={`rounded-xl ${module.accent} p-3 text-white`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Open</span>
-                  </div>
-                  <h3 className="mt-4 text-lg font-semibold text-gray-900 group-hover:text-gray-800">
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
+            gap: 2,
+          }}
+        >
+          {ADMIN_MODULES.map((module) => {
+            const Icon = module.icon
+            return (
+              <Card
+                key={module.id}
+                component={Link}
+                to={`/admin/${module.id}`}
+                sx={{
+                  textDecoration: 'none',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  height: '100%',
+                  transition: 'transform .2s ease, box-shadow .2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-3px)',
+                    boxShadow: 6,
+                  },
+                }}
+              >
+                <CardContent>
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                    <Avatar sx={{ bgcolor: module.accent }}>
+                      <Icon fontSize="small" />
+                    </Avatar>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                      OPEN
+                    </Typography>
+                  </Stack>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mt: 1.3 }}>
                     {module.title}
-                  </h3>
-                  <p className="mt-2 text-sm text-gray-600">{module.description}</p>
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      </div>
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.8 }}>
+                    {module.description}
+                  </Typography>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </Box>
+      </Box>
 
       {showStudents && (
         <Modal title="Active students" onClose={() => setShowStudents(false)}>
-          {studentsError && (
-            <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-              {studentsError}
-            </div>
-          )}
+          {studentsError && <Alert severity="error" sx={{ mb: 1.2 }}>{studentsError}</Alert>}
           {studentsLoading ? (
-            <div className="text-sm text-gray-500">Loading students...</div>
+            <Typography variant="body2" color="text.secondary">Loading students...</Typography>
           ) : (
-            <div className="space-y-3">
+            <Stack spacing={1}>
               {students.map((student) => (
-                <div key={student._id} className="rounded-lg border border-gray-200 px-3 py-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {student.firstName} {student.lastName}
-                      </p>
-                      <p className="text-xs text-gray-500">{student.studentId} • {student.program}</p>
-                    </div>
-                    <button
-                      onClick={() => toggleStudentStatus(student._id, !student.isActive)}
-                      className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700"
-                    >
-                      {student.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                  </div>
-                </div>
+                <Card key={student._id} variant="outlined">
+                  <CardContent sx={{ py: 1.2, '&:last-child': { pb: 1.2 } }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                          {student.firstName} {student.lastName}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {student.studentId} • {student.program}
+                        </Typography>
+                      </Box>
+                      <Button size="small" variant="outlined" onClick={() => toggleStudentStatus(student._id, !student.isActive)}>
+                        {student.isActive ? 'Deactivate' : 'Activate'}
+                      </Button>
+                    </Stack>
+                  </CardContent>
+                </Card>
               ))}
-              {!students.length && (
-                <div className="text-sm text-gray-500">No active students found.</div>
-              )}
-            </div>
+              {!students.length && <Typography variant="body2" color="text.secondary">No active students found.</Typography>}
+            </Stack>
           )}
         </Modal>
       )}
-    </div>
+
+      {showChatbotQuestions && (
+        <Modal title="Unanswered chatbot questions" onClose={() => setShowChatbotQuestions(false)}>
+          {chatbotError && <Alert severity="error" sx={{ mb: 1.2 }}>{chatbotError}</Alert>}
+          {chatbotLoading ? (
+            <Typography variant="body2" color="text.secondary">Loading questions...</Typography>
+          ) : (
+            <Stack spacing={1.2}>
+              {chatbotQuestions.map((item) => (
+                <Card key={item.id} variant="outlined">
+                  <CardContent sx={{ py: 1.4, '&:last-child': { pb: 1.4 } }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      {item.student ? `${item.student.firstName} ${item.student.lastName}` : 'Student'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.8 }}>
+                      {item.student?.studentId || 'N/A'} • {new Date(item.submittedAt).toLocaleString()}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      {item.question}
+                    </Typography>
+                    <Divider sx={{ mb: 1 }} />
+                    <TextField
+                      multiline
+                      minRows={2}
+                      fullWidth
+                      size="small"
+                      placeholder="Write the answer for student"
+                      value={answerDrafts[item.id] || ''}
+                      onChange={(e) => setAnswerDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                    />
+                    <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1 }}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => publishChatbotAnswer(item.id)}
+                        disabled={answerSavingId === item.id}
+                      >
+                        {answerSavingId === item.id ? 'Publishing...' : 'Publish answer'}
+                      </Button>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ))}
+              {!chatbotQuestions.length && (
+                <Typography variant="body2" color="text.secondary">
+                  No unanswered chatbot questions right now.
+                </Typography>
+              )}
+            </Stack>
+          )}
+        </Modal>
+      )}
+    </Stack>
   )
 }
 

@@ -172,7 +172,7 @@ const getTypeColor = (type: string) => {
 }
 
 const MentalHealthSupport: React.FC = () => {
-  const apiBaseUrl = 'http://localhost:5000/api'
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
   const [selectedCounselor, setSelectedCounselor] = useState<Counselor | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState<'counseling' | 'resources' | 'groups' | 'emergency'>('counseling')
@@ -1022,3 +1022,4 @@ const MentalHealthSupport: React.FC = () => {
 }
 
 export default MentalHealthSupport
+

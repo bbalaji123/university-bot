@@ -138,7 +138,7 @@ const getEventColor = (type: string) => {
 }
 
 const CareerSupport: React.FC = () => {
-  const apiBaseUrl = 'http://localhost:5000/api'
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
   const [activeTab, setActiveTab] = useState<'internships' | 'resume' | 'interviews' | 'events'>('internships')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closing-soon' | 'closed'>('all')
@@ -767,3 +767,4 @@ const CareerSupport: React.FC = () => {
 }
 
 export default CareerSupport
+

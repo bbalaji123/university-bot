@@ -11,6 +11,10 @@ pnpm-debug.log*
 .env
 .env.*
 
+# Python virtual environments
+backend/.venv/
+backend/.venv310/
+
 # Local env variants
 .env.local
 .env.development.local

@@ -1,6 +1,25 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Settings, Eye, EyeOff, Pencil, Megaphone, ArrowRight } from 'lucide-react'
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
+import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded'
+import EditRoundedIcon from '@mui/icons-material/EditRounded'
+import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded'
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Checkbox,
+  FormControlLabel,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+  Chip,
+} from '@mui/material'
 import Modal from '../../components/Modal'
 
 interface ModuleConfig {
@@ -14,7 +33,7 @@ interface ModuleConfig {
 }
 
 const AdminModules: React.FC = () => {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
   const location = useLocation()
   const statusFilter = useMemo(() => new URLSearchParams(location.search).get('status') || 'all', [location.search])
 
@@ -27,13 +46,13 @@ const AdminModules: React.FC = () => {
     title: '',
     description: '',
     isActive: true,
-    visibility: 'both' as ModuleConfig['visibility']
+    visibility: 'both' as ModuleConfig['visibility'],
   })
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false)
   const [announcementForm, setAnnouncementForm] = useState({
     title: '',
-    message: ''
+    message: '',
   })
 
   const loadModules = async () => {
@@ -44,7 +63,7 @@ const AdminModules: React.FC = () => {
       setLoading(true)
       setError('')
       const response = await fetch(`${apiBaseUrl}/admin/modules`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!response.ok) {
@@ -53,7 +72,7 @@ const AdminModules: React.FC = () => {
 
       const data = await response.json()
       setModules(data.modules || [])
-    } catch (err) {
+    } catch {
       setError('Unable to load module configuration')
     } finally {
       setLoading(false)
@@ -69,7 +88,7 @@ const AdminModules: React.FC = () => {
       moduleList.map(async (module) => {
         try {
           const response = await fetch(`${apiBaseUrl}/admin/requests/${module.moduleId}?status=pending`, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           })
 
           if (!response.ok) {
@@ -104,7 +123,7 @@ const AdminModules: React.FC = () => {
       title: module.title,
       description: module.description,
       isActive: module.isActive,
-      visibility: module.visibility
+      visibility: module.visibility,
     })
     setShowEditModal(true)
   }
@@ -127,9 +146,9 @@ const AdminModules: React.FC = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(editForm)
+        body: JSON.stringify(editForm),
       })
 
       if (!response.ok) {
@@ -137,11 +156,9 @@ const AdminModules: React.FC = () => {
       }
 
       const data = await response.json()
-      setModules((prev) =>
-        prev.map((module) => (module.moduleId === selectedModule.moduleId ? data.module : module))
-      )
+      setModules((prev) => prev.map((module) => (module.moduleId === selectedModule.moduleId ? data.module : module)))
       setShowEditModal(false)
-    } catch (err) {
+    } catch {
       setError('Unable to update module settings')
     }
   }
@@ -158,9 +175,9 @@ const AdminModules: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(announcementForm)
+        body: JSON.stringify(announcementForm),
       })
 
       if (!response.ok) {
@@ -168,11 +185,9 @@ const AdminModules: React.FC = () => {
       }
 
       const data = await response.json()
-      setModules((prev) =>
-        prev.map((module) => (module.moduleId === selectedModule.moduleId ? data.module : module))
-      )
+      setModules((prev) => prev.map((module) => (module.moduleId === selectedModule.moduleId ? data.module : module)))
       setShowAnnouncementModal(false)
-    } catch (err) {
+    } catch {
       setError('Unable to publish announcement')
     }
   }
@@ -182,181 +197,151 @@ const AdminModules: React.FC = () => {
     : modules
 
   return (
-    <div className="min-h-screen bg-gray-50 px-6 py-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-gray-900">Module Management</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Update module settings, publish announcements, and review pending requests.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Settings className="h-4 w-4" />
-            Admin tools
-          </div>
-        </div>
+    <Stack spacing={2.3}>
+      <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between" spacing={1.25}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            Module Management
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Update module settings, publish announcements, and review pending requests.
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={0.8} alignItems="center">
+          <SettingsRoundedIcon color="action" fontSize="small" />
+          <Typography variant="caption" color="text.secondary">Admin tools</Typography>
+        </Stack>
+      </Stack>
 
-        {error && (
-          <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
-          </div>
-        )}
+      {error && <Alert severity="error">{error}</Alert>}
 
-        {loading ? (
-          <div className="mt-10 text-sm text-gray-500">Loading modules...</div>
-        ) : (
-          <div className="mt-8 grid gap-5 md:grid-cols-2">
-            {filteredModules.map((module) => (
-              <div key={module.moduleId} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">{module.title}</h2>
-                    <p className="mt-1 text-sm text-gray-600">{module.description}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                      module.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {module.isActive ? 'Active' : 'Paused'}
-                    </span>
-                    <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
-                      {module.visibility}
-                    </span>
-                  </div>
-                </div>
+      {loading ? (
+        <Typography variant="body2" color="text.secondary">Loading modules...</Typography>
+      ) : (
+        <Stack spacing={1.5}>
+          {filteredModules.map((module) => (
+            <Card key={module.moduleId} elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+              <CardContent>
+                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {module.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      {module.description}
+                    </Typography>
+                    <Stack direction="row" spacing={0.8} sx={{ mt: 1 }}>
+                      <Chip label={module.isActive ? 'Active' : 'Paused'} color={module.isActive ? 'success' : 'default'} size="small" />
+                      <Chip label={module.visibility} size="small" color="info" variant="outlined" />
+                      <Chip label={`Pending: ${pendingCounts[module.moduleId] || 0}`} size="small" variant="outlined" />
+                    </Stack>
+                    <Stack direction="row" spacing={1.5} sx={{ mt: 1.2 }}>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        {module.isActive ? <VisibilityRoundedIcon fontSize="small" /> : <VisibilityOffRoundedIcon fontSize="small" />}
+                        <Typography variant="caption" color="text.secondary">{module.isActive ? 'Visible' : 'Hidden'}</Typography>
+                      </Stack>
+                    </Stack>
+                  </Box>
 
-                <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-500">
-                  <div className="flex items-center gap-1">
-                    {module.isActive ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                    {module.isActive ? 'Visible' : 'Hidden'}
-                  </div>
-                  <div>Pending: {pendingCounts[module.moduleId] || 0}</div>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <button
-                    onClick={() => openEditModal(module)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Edit module
-                  </button>
-                  <button
-                    onClick={() => openAnnouncementModal(module)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700"
-                  >
-                    <Megaphone className="h-4 w-4" />
-                    Announcement
-                  </button>
-                  <Link
-                    to={`/admin/${module.moduleId}`}
-                    className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white"
-                  >
-                    Review requests
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                    <Button variant="outlined" startIcon={<EditRoundedIcon />} onClick={() => openEditModal(module)}>
+                      Edit module
+                    </Button>
+                    <Button variant="outlined" startIcon={<CampaignRoundedIcon />} onClick={() => openAnnouncementModal(module)}>
+                      Announcement
+                    </Button>
+                    <Button component={Link} to={`/admin/${module.moduleId}`} variant="contained" endIcon={<ArrowForwardRoundedIcon />}>
+                      Review requests
+                    </Button>
+                  </Stack>
+                </Stack>
 
                 {module.announcements && module.announcements.length > 0 && (
-                  <div className="mt-5 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                    Latest announcement: {module.announcements[module.announcements.length - 1].title}
-                  </div>
+                  <Box sx={{ mt: 1.4, p: 1.2, borderRadius: 2, bgcolor: 'action.hover' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Latest announcement: {module.announcements[module.announcements.length - 1].title}
+                    </Typography>
+                  </Box>
                 )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      )}
 
       {showEditModal && selectedModule && (
         <Modal title={`Edit ${selectedModule.title}`} onClose={() => setShowEditModal(false)}>
-          <form className="space-y-4" onSubmit={handleUpdateModule}>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Title</label>
-              <input
-                type="text"
-                value={editForm.title}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
-              <textarea
-                value={editForm.description}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                rows={3}
-                required
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <input
-                id="isActive"
-                type="checkbox"
-                checked={editForm.isActive}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, isActive: e.target.checked }))}
-                className="h-4 w-4"
-              />
-              <label htmlFor="isActive" className="text-sm text-gray-700">Active for users</label>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Visibility</label>
-              <select
-                value={editForm.visibility}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, visibility: e.target.value as ModuleConfig['visibility'] }))}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="both">Students and admins</option>
-                <option value="students">Students only</option>
-                <option value="admins">Admins only</option>
-              </select>
-            </div>
-            <button
-              type="submit"
-              className="w-full rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white"
+          <Stack component="form" spacing={1.4} onSubmit={handleUpdateModule}>
+            <TextField
+              label="Title"
+              value={editForm.title}
+              onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
+              required
+              fullWidth
+              size="small"
+            />
+            <TextField
+              label="Description"
+              value={editForm.description}
+              onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
+              required
+              fullWidth
+              multiline
+              minRows={3}
+              size="small"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={editForm.isActive}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, isActive: e.target.checked }))}
+                />
+              }
+              label="Active for users"
+            />
+            <TextField
+              select
+              label="Visibility"
+              value={editForm.visibility}
+              onChange={(e) => setEditForm((prev) => ({ ...prev, visibility: e.target.value as ModuleConfig['visibility'] }))}
+              fullWidth
+              size="small"
             >
-              Save changes
-            </button>
-          </form>
+              <MenuItem value="both">Students and admins</MenuItem>
+              <MenuItem value="students">Students only</MenuItem>
+              <MenuItem value="admins">Admins only</MenuItem>
+            </TextField>
+            <Button type="submit" variant="contained">Save changes</Button>
+          </Stack>
         </Modal>
       )}
 
       {showAnnouncementModal && selectedModule && (
         <Modal title={`Announcement for ${selectedModule.title}`} onClose={() => setShowAnnouncementModal(false)}>
-          <form className="space-y-4" onSubmit={handlePublishAnnouncement}>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Title</label>
-              <input
-                type="text"
-                value={announcementForm.title}
-                onChange={(e) => setAnnouncementForm((prev) => ({ ...prev, title: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Message</label>
-              <textarea
-                value={announcementForm.message}
-                onChange={(e) => setAnnouncementForm((prev) => ({ ...prev, message: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                rows={4}
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white"
-            >
-              Publish announcement
-            </button>
-          </form>
+          <Stack component="form" spacing={1.4} onSubmit={handlePublishAnnouncement}>
+            <TextField
+              label="Title"
+              value={announcementForm.title}
+              onChange={(e) => setAnnouncementForm((prev) => ({ ...prev, title: e.target.value }))}
+              required
+              fullWidth
+              size="small"
+            />
+            <TextField
+              label="Message"
+              value={announcementForm.message}
+              onChange={(e) => setAnnouncementForm((prev) => ({ ...prev, message: e.target.value }))}
+              required
+              multiline
+              minRows={4}
+              fullWidth
+              size="small"
+            />
+            <Button type="submit" variant="contained">Publish announcement</Button>
+          </Stack>
         </Modal>
       )}
-    </div>
+    </Stack>
   )
 }
 

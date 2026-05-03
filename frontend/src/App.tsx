@@ -3,8 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import Login from './pages/Login'
+import Register from './pages/Register'
 import Profile from './pages/Profile'
 import ChatInterface from './pages/ChatInterface'
+import StudentQuestions from './pages/StudentQuestions'
 import AdmissionAssistance from './pages/modules/AdmissionAssistance'
 import AcademicSupport from './pages/modules/AcademicSupport'
 import FinancialAssistance from './pages/modules/FinancialAssistance'
@@ -14,6 +16,7 @@ import CareerSupport from './pages/modules/CareerSupport'
 import SocialMediaIntegration from './components/SocialMediaIntegration'
 import AIGeneratedFAQSystem from './components/AIGeneratedFAQSystem'
 import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminChatbotQuestions from './pages/admin/AdminChatbotQuestions'
 import AdminModule from './pages/admin/AdminModule'
 import AdminModules from './pages/admin/AdminModules'
 
@@ -84,10 +87,19 @@ function App() {
             </PublicOnly>
           }
         />
+        <Route
+          path="/register"
+          element={
+            <PublicOnly>
+              <Register />
+            </PublicOnly>
+          }
+        />
         <Route element={<ProtectedLayout />}>
           <Route element={<RequireRole role="admin" />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/modules" element={<AdminModules />} />
+            <Route path="/admin/chatbot-questions" element={<AdminChatbotQuestions />} />
             <Route path="/admin/:moduleId" element={<AdminModule />} />
           </Route>
           <Route element={<RequireRole role="student" />}>
@@ -102,6 +114,7 @@ function App() {
             <Route path="/career" element={<CareerSupport />} />
             <Route path="/social-media" element={<SocialMediaIntegration />} />
             <Route path="/ai-faqs" element={<AIGeneratedFAQSystem />} />
+            <Route path="/my-questions" element={<StudentQuestions />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />

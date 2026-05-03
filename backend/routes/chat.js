@@ -3,10 +3,21 @@
 // ========================================
 
 const express = require('express');
-const { ChatMessage, User } = require('../models/User');
+const { ChatMessage, User, SupportTicket, ChatResponseFeedback, ChatFeedbackSummary } = require('../models/User');
 const { authenticateToken } = require('./auth');
 
 const router = express.Router();
+
+const FALLBACK_REPLY = 'Please contact university administration.';
+const FEEDBACK_ALERT_THRESHOLD = 5;
+
+const normalizeQuestionKey = (question = '') => {
+  return String(question)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
 
 const POSITIVE_WORDS = [
   'happy', 'good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic', 'love',
@@ -334,6 +345,373 @@ router.delete('/clear', authenticateToken, async (req, res) => {
     console.error('Chat clear error:', error);
     res.status(500).json({
       error: 'Failed to clear chat history',
+      message: 'Server error'
+    });
+  }
+});
+
+// POST /api/chat/escalations
+// Submit unanswered chatbot question for admin review
+router.post('/escalations', authenticateToken, async (req, res) => {
+  try {
+    const { question, language = 'en' } = req.body;
+
+    if (!question || !question.trim()) {
+      return res.status(400).json({
+        error: 'Question is required'
+      });
+    }
+
+    const user = await User.findById(req.userId).select('role firstName lastName studentId');
+    if (!user || user.role !== 'student') {
+      return res.status(403).json({
+        error: 'Only students can submit unanswered chatbot questions'
+      });
+    }
+
+    const cleanedQuestion = question.trim();
+    const ticket = await SupportTicket.create({
+      userId: req.userId,
+      subject: 'Unanswered chatbot question',
+      description: cleanedQuestion,
+      studentQuestion: cleanedQuestion,
+      source: 'chatbot',
+      language,
+      category: 'technical',
+      priority: 'medium',
+      status: 'open',
+      studentNotified: true,
+      studentRead: false,
+      messages: [
+        {
+          sender: req.userId,
+          message: cleanedQuestion,
+          isInternal: false,
+          timestamp: new Date()
+        }
+      ]
+    });
+
+    res.status(201).json({
+      message: 'Question submitted to admin. You will be notified when an answer is ready.',
+      ticket: {
+        id: ticket._id,
+        question: ticket.studentQuestion,
+        status: ticket.status,
+        submittedAt: ticket.createdAt || ticket.submittedAt
+      }
+    });
+  } catch (error) {
+    console.error('Chat escalation submit error:', error);
+    res.status(500).json({
+      error: 'Failed to submit question',
+      message: 'Server error'
+    });
+  }
+});
+
+// GET /api/chat/escalations/mine
+// Fetch student chatbot escalations and answers
+router.get('/escalations/mine', authenticateToken, async (req, res) => {
+  try {
+    const statusParam = String(req.query.status || 'all');
+    const query = {
+      userId: req.userId,
+      source: 'chatbot'
+    };
+
+    if (statusParam === 'pending') {
+      query.status = { $in: ['open', 'in-progress'] };
+    } else if (statusParam === 'answered') {
+      query.status = { $in: ['resolved', 'closed'] };
+    }
+
+    const tickets = await SupportTicket.find(query)
+      .sort({ createdAt: -1, submittedAt: -1 })
+      .select('studentQuestion status adminAnswer answeredAt studentNotified studentRead createdAt submittedAt');
+
+    res.json({
+      escalations: tickets.map((ticket) => ({
+        id: ticket._id,
+        question: ticket.studentQuestion || ticket.description,
+        status: ticket.status,
+        answer: ticket.adminAnswer || '',
+        answeredAt: ticket.answeredAt,
+        submittedAt: ticket.createdAt || ticket.submittedAt,
+        studentNotified: Boolean(ticket.studentNotified),
+        studentRead: Boolean(ticket.studentRead)
+      }))
+    });
+  } catch (error) {
+    console.error('Chat escalation fetch error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch escalations',
+      message: 'Server error'
+    });
+  }
+});
+
+// GET /api/chat/escalations/notifications
+// Return unread answer notifications for student
+router.get('/escalations/notifications', authenticateToken, async (req, res) => {
+  try {
+    const unreadCount = await SupportTicket.countDocuments({
+      userId: req.userId,
+      source: 'chatbot',
+      status: { $in: ['resolved', 'closed'] },
+      studentRead: false,
+      adminAnswer: { $exists: true, $ne: '' }
+    });
+
+    res.json({
+      unreadCount
+    });
+  } catch (error) {
+    console.error('Chat escalation notifications error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch notifications',
+      message: 'Server error'
+    });
+  }
+});
+
+// PATCH /api/chat/escalations/:id/read
+// Mark answered ticket as read by student
+router.patch('/escalations/:id/read', authenticateToken, async (req, res) => {
+  try {
+    const updated = await SupportTicket.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: req.userId,
+        source: 'chatbot'
+      },
+      {
+        studentRead: true
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({
+        error: 'Escalation not found'
+      });
+    }
+
+    res.json({
+      message: 'Notification acknowledged'
+    });
+  } catch (error) {
+    console.error('Chat escalation read error:', error);
+    res.status(500).json({
+      error: 'Failed to update notification',
+      message: 'Server error'
+    });
+  }
+});
+
+// GET /api/chat/escalations/published-faqs
+// Return unique, admin-answered chatbot questions for FAQ display
+router.get('/escalations/published-faqs', authenticateToken, async (req, res) => {
+  try {
+    const answeredTickets = await SupportTicket.find({
+      source: 'chatbot',
+      status: { $in: ['resolved', 'closed'] },
+      adminAnswer: { $exists: true, $ne: '' }
+    })
+      .sort({ answeredAt: -1, updatedAt: -1, createdAt: -1 })
+      .select('studentQuestion description adminAnswer answeredAt updatedAt createdAt');
+
+    const seenQuestions = new Set();
+    const publishedFaqs = [];
+
+    answeredTickets.forEach((ticket) => {
+      const question = String(ticket.studentQuestion || ticket.description || '').trim();
+      const answer = String(ticket.adminAnswer || '').trim();
+
+      if (!question || !answer) {
+        return;
+      }
+
+      const normalizedQuestion = question.toLowerCase().replace(/\s+/g, ' ').trim();
+      if (seenQuestions.has(normalizedQuestion)) {
+        return;
+      }
+
+      seenQuestions.add(normalizedQuestion);
+      publishedFaqs.push({
+        id: ticket._id,
+        question,
+        answer,
+        answeredAt: ticket.answeredAt || ticket.updatedAt || ticket.createdAt
+      });
+    });
+
+    res.json({
+      faqs: publishedFaqs
+    });
+  } catch (error) {
+    console.error('Published chatbot FAQ fetch error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch published FAQs',
+      message: 'Server error'
+    });
+  }
+});
+
+// POST /api/chat/feedback
+// Capture 👍/👎 feedback for bot responses and raise admin alert after repeated 👎
+router.post('/feedback', authenticateToken, async (req, res) => {
+  try {
+    const {
+      responseId,
+      question,
+      reply,
+      vote,
+      language = 'en'
+    } = req.body;
+
+    if (!responseId || !String(responseId).trim()) {
+      return res.status(400).json({ error: 'responseId is required' });
+    }
+
+    if (!question || !String(question).trim()) {
+      return res.status(400).json({ error: 'question is required' });
+    }
+
+    if (!reply || !String(reply).trim()) {
+      return res.status(400).json({ error: 'reply is required' });
+    }
+
+    if (!['up', 'down'].includes(String(vote || '').trim())) {
+      return res.status(400).json({ error: 'vote must be up or down' });
+    }
+
+    const normalizedQuestion = normalizeQuestionKey(question);
+    if (!normalizedQuestion) {
+      return res.status(400).json({ error: 'question is invalid' });
+    }
+
+    const now = new Date();
+    const nextVote = String(vote).trim();
+
+    const existingFeedback = await ChatResponseFeedback.findOne({
+      userId: req.userId,
+      responseId: String(responseId).trim()
+    });
+
+    let previousVote = null;
+    if (!existingFeedback) {
+      await ChatResponseFeedback.create({
+        userId: req.userId,
+        responseId: String(responseId).trim(),
+        question: String(question).trim(),
+        normalizedQuestion,
+        reply: String(reply).trim(),
+        vote: nextVote,
+        language,
+        createdAt: now,
+        updatedAt: now
+      });
+    } else {
+      previousVote = existingFeedback.vote;
+      existingFeedback.question = String(question).trim();
+      existingFeedback.normalizedQuestion = normalizedQuestion;
+      existingFeedback.reply = String(reply).trim();
+      existingFeedback.vote = nextVote;
+      existingFeedback.language = language;
+      existingFeedback.updatedAt = now;
+      await existingFeedback.save();
+    }
+
+    let summary = await ChatFeedbackSummary.findOne({ normalizedQuestion });
+    if (!summary) {
+      summary = await ChatFeedbackSummary.create({
+        normalizedQuestion,
+        sampleQuestion: String(question).trim(),
+        sampleReply: String(reply).trim(),
+        thumbsUpCount: 0,
+        thumbsDownCount: 0,
+        alertSent: false,
+        createdAt: now,
+        updatedAt: now,
+        lastSeenAt: now
+      });
+    }
+
+    if (previousVote === 'up') {
+      summary.thumbsUpCount = Math.max(0, Number(summary.thumbsUpCount || 0) - 1);
+    }
+    if (previousVote === 'down') {
+      summary.thumbsDownCount = Math.max(0, Number(summary.thumbsDownCount || 0) - 1);
+    }
+
+    if (nextVote === 'up') {
+      summary.thumbsUpCount = Number(summary.thumbsUpCount || 0) + 1;
+    } else {
+      summary.thumbsDownCount = Number(summary.thumbsDownCount || 0) + 1;
+    }
+
+    summary.sampleQuestion = String(question).trim();
+    summary.sampleReply = String(reply).trim();
+    summary.updatedAt = now;
+    summary.lastSeenAt = now;
+
+    let alertRaised = false;
+    if (summary.thumbsDownCount > FEEDBACK_ALERT_THRESHOLD && !summary.alertSent) {
+      const alertTicket = await SupportTicket.create({
+        userId: req.userId,
+        subject: 'Chatbot answer needs review (repeated downvotes)',
+        description:
+          `Question: ${summary.sampleQuestion}\n` +
+          `Thumbs down: ${summary.thumbsDownCount}\n` +
+          `Thumbs up: ${summary.thumbsUpCount}\n` +
+          `Latest answer sample: ${summary.sampleReply}`,
+        source: 'chatbot',
+        studentQuestion: summary.sampleQuestion,
+        language,
+        category: 'technical',
+        priority: 'high',
+        status: 'open',
+        studentNotified: false,
+        studentRead: true,
+        messages: [
+          {
+            sender: req.userId,
+            message:
+              `Auto-alert: question crossed ${FEEDBACK_ALERT_THRESHOLD} downvotes. ` +
+              `Please review dataset answer quality for this question intent.`,
+            isInternal: true,
+            timestamp: now
+          }
+        ]
+      });
+
+      summary.alertSent = true;
+      summary.alertTicketId = alertTicket._id;
+      alertRaised = true;
+    }
+
+    await summary.save();
+
+    res.status(200).json({
+      message: 'Feedback recorded',
+      feedback: {
+        responseId: String(responseId).trim(),
+        vote: nextVote,
+        previousVote,
+        normalizedQuestion
+      },
+      summary: {
+        thumbsUpCount: summary.thumbsUpCount,
+        thumbsDownCount: summary.thumbsDownCount,
+        alertSent: summary.alertSent,
+        alertRaised
+      }
+    });
+  } catch (error) {
+    console.error('Chat feedback error:', error);
+    res.status(500).json({
+      error: 'Failed to record feedback',
       message: 'Server error'
     });
   }

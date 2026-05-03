@@ -95,7 +95,7 @@ const getStatusColor = (status: string) => {
 }
 
 const AdmissionAssistance: React.FC = () => {
-  const apiBaseUrl = 'http://localhost:5000/api'
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'closing-soon'>('all')
@@ -841,3 +841,4 @@ const AdmissionAssistance: React.FC = () => {
 }
 
 export default AdmissionAssistance
+

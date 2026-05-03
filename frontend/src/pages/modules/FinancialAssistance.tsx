@@ -149,7 +149,7 @@ const getCategoryColor = (category: string) => {
 }
 
 const FinancialAssistance: React.FC = () => {
-  const apiBaseUrl = 'http://localhost:5000/api'
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
   const [selectedScholarship, setSelectedScholarship] = useState<Scholarship | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState<'scholarships' | 'payment' | 'loans'>('scholarships')
@@ -952,3 +952,4 @@ const FinancialAssistance: React.FC = () => {
 }
 
 export default FinancialAssistance
+

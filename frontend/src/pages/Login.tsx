@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   Lock,
   Eye,
@@ -15,9 +16,18 @@ interface LoginFormData {
   password: string
 }
 
+interface ForgotPasswordFormData {
+  studentId: string
+  year: string
+  section: string
+  newPassword: string
+  confirmPassword: string
+}
+
 type LoginMode = 'student' | 'admin'
 
 const HERO_IMAGE = '/vignan-campus.png'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
 
 const Login: React.FC = () => {
   const navigate = useNavigate()
@@ -29,11 +39,101 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotPasswordForm, setForgotPasswordForm] = useState<ForgotPasswordFormData>({
+    studentId: '',
+    year: '',
+    section: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotError, setForgotError] = useState('')
+  const [forgotSuccess, setForgotSuccess] = useState('')
+
+  const years = ['1', '2', '3', '4', '5', '6']
+  const sections = ['A', 'B', 'C', 'D']
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
     setError('')
+  }
+
+  const handleForgotPasswordInput = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target
+    setForgotPasswordForm(prev => ({ ...prev, [name]: value }))
+    setForgotError('')
+    setForgotSuccess('')
+  }
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (
+      !forgotPasswordForm.studentId ||
+      !forgotPasswordForm.year ||
+      !forgotPasswordForm.section ||
+      !forgotPasswordForm.newPassword ||
+      !forgotPasswordForm.confirmPassword
+    ) {
+      setForgotError('Please fill in all fields')
+      return
+    }
+
+    if (forgotPasswordForm.newPassword !== forgotPasswordForm.confirmPassword) {
+      setForgotError('Passwords do not match')
+      return
+    }
+
+    if (forgotPasswordForm.newPassword.length < 6) {
+      setForgotError('Password must be at least 6 characters long')
+      return
+    }
+
+    setForgotLoading(true)
+    setForgotError('')
+    setForgotSuccess('')
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentId: forgotPasswordForm.studentId,
+          year: parseInt(forgotPasswordForm.year),
+          section: forgotPasswordForm.section,
+          newPassword: forgotPasswordForm.newPassword,
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setForgotSuccess(data?.message || 'Password reset successful. Please login.')
+        setTimeout(() => {
+          setShowForgotPassword(false)
+          setForgotPasswordForm({
+            studentId: '',
+            year: '',
+            section: '',
+            newPassword: '',
+            confirmPassword: ''
+          })
+          setFormData(prev => ({ ...prev, registrationId: forgotPasswordForm.studentId }))
+        }, 1200)
+      } else {
+        setForgotError(data?.error || data?.message || 'Failed to reset password')
+      }
+    } catch {
+      setForgotError('Network error. Please try again.')
+    } finally {
+      setForgotLoading(false)
+    }
   }
 
   const validateForm = () => {
@@ -47,14 +147,14 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) return
 
     setLoading(true)
     setError('')
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +173,7 @@ const Login: React.FC = () => {
         // Store token and user data
         localStorage.setItem('token', data.token)
         localStorage.setItem('user', JSON.stringify(data.user))
-        
+
         // Redirect by role
         navigate(data.user?.role === 'admin' ? '/admin' : '/')
       } else {
@@ -175,7 +275,7 @@ const Login: React.FC = () => {
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
                   {loginMode === 'student'
-                    ? 'Sign in with your registration ID and password to access academic, financial, and AI support tools.'
+                    ? 'Sign in with your registration number and mobile number password to access academic, financial, and AI support tools.'
                     : 'Sign in with your admin ID and password to manage student services and system settings.'}
                 </p>
 
@@ -193,16 +293,16 @@ const Login: React.FC = () => {
                     </label>
                     <div className="relative mt-2">
                       <input
-                          id="registrationId"
-                          name="registrationId"
-                          type="text"
+                        id="registrationId"
+                        name="registrationId"
+                        type="text"
                         required
-                          value={formData.registrationId}
+                        value={formData.registrationId}
                         onChange={handleInputChange}
                         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pl-11 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                          placeholder={loginMode === 'student' ? 'ST2024001' : 'ADMIN-001'}
+                        placeholder={loginMode === 'student' ? '231FA0XXXX' : 'ADMIN-001'}
                       />
-                        <GraduationCap className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
+                      <GraduationCap className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
                     </div>
                   </div>
 
@@ -219,7 +319,7 @@ const Login: React.FC = () => {
                         value={formData.password}
                         onChange={handleInputChange}
                         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pl-11 pr-11 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                        placeholder="••••••••"
+                        placeholder={loginMode === 'student' ? 'Mobile number' : '••••••••'}
                       />
                       <Lock className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
                       <button
@@ -242,9 +342,23 @@ const Login: React.FC = () => {
                       />
                       Remember me
                     </label>
-                    <a href="#" className="text-slate-500 hover:text-rose-500">
-                      Forgot password
-                    </a>
+                    {loginMode === 'student' && (
+                      <button
+                        type="button"
+                        className="text-slate-500 hover:text-rose-500"
+                        onClick={() => {
+                          setShowForgotPassword(true)
+                          setForgotError('')
+                          setForgotSuccess('')
+                          setForgotPasswordForm(prev => ({
+                            ...prev,
+                            studentId: formData.registrationId || prev.studentId
+                          }))
+                        }}
+                      >
+                        Forgot password
+                      </button>
+                    )}
                   </div>
 
                   <button
@@ -256,9 +370,146 @@ const Login: React.FC = () => {
                   </button>
 
                   <p className="text-center text-sm text-slate-500">
-                    Need access? Contact your department admin.
+                    {loginMode === 'student' ? (
+                      <>
+                        New student?{' '}
+                        <Link to="/register" className="font-semibold text-rose-500 hover:text-rose-600">
+                          Register here
+                        </Link>
+                      </>
+                    ) : (
+                      'Need access? Contact your department admin.'
+                    )}
                   </p>
                 </form>
+
+                {showForgotPassword && loginMode === 'student' && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4">
+                    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+                      <div className="mb-4 flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-slate-900">Reset Student Password</h3>
+                        <button
+                          type="button"
+                          className="text-sm text-slate-500 hover:text-slate-700"
+                          onClick={() => setShowForgotPassword(false)}
+                          disabled={forgotLoading}
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      {forgotError && (
+                        <div className="mb-3 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
+                          <AlertCircle className="h-4 w-4 text-rose-500" />
+                          <span className="text-xs text-rose-700">{forgotError}</span>
+                        </div>
+                      )}
+
+                      {forgotSuccess && (
+                        <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                          {forgotSuccess}
+                        </div>
+                      )}
+
+                      <form className="space-y-3" onSubmit={handleForgotPasswordSubmit}>
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            Registration ID
+                          </label>
+                          <input
+                            name="studentId"
+                            type="text"
+                            value={forgotPasswordForm.studentId}
+                            onChange={handleForgotPasswordInput}
+                            required
+                            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                            placeholder="231FA0XXXX"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                              Year
+                            </label>
+                            <select
+                              name="year"
+                              value={forgotPasswordForm.year}
+                              onChange={handleForgotPasswordInput}
+                              required
+                              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                            >
+                              <option value="">Select</option>
+                              {years.map((year) => (
+                                <option key={year} value={year}>
+                                  Year {year}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                              Section
+                            </label>
+                            <select
+                              name="section"
+                              value={forgotPasswordForm.section}
+                              onChange={handleForgotPasswordInput}
+                              required
+                              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                            >
+                              <option value="">Select</option>
+                              {sections.map((section) => (
+                                <option key={section} value={section}>
+                                  Section {section}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            New Password
+                          </label>
+                          <input
+                            name="newPassword"
+                            type="password"
+                            value={forgotPasswordForm.newPassword}
+                            onChange={handleForgotPasswordInput}
+                            required
+                            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                            placeholder="Enter new password"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            Confirm New Password
+                          </label>
+                          <input
+                            name="confirmPassword"
+                            type="password"
+                            value={forgotPasswordForm.confirmPassword}
+                            onChange={handleForgotPasswordInput}
+                            required
+                            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                            placeholder="Re-enter password"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={forgotLoading}
+                          className="mt-1 w-full rounded-xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-rose-500/30 transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {forgotLoading ? 'Resetting...' : 'Reset Password'}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -269,3 +520,4 @@ const Login: React.FC = () => {
 }
 
 export default Login
+

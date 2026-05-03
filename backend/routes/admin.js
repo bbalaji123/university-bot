@@ -12,7 +12,9 @@ const {
   MentalHealthGroupJoin,
   MentalHealthResourceAccess,
   CareerResumeReviewRequest,
-  CareerMockInterviewRequest
+  CareerMockInterviewRequest,
+  SupportTicket,
+  ChatFeedbackSummary
 } = require('../models/User');
 const { authenticateToken, requireAdmin } = require('./auth');
 
@@ -584,6 +586,154 @@ router.patch('/students/:id', authenticateToken, requireAdmin, async (req, res) 
     console.error('Admin student update error:', error);
     res.status(500).json({
       error: 'Failed to update student',
+      message: 'Server error'
+    });
+  }
+});
+
+router.get('/chatbot-questions', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const statusParam = String(req.query.status || 'pending');
+    const query = {
+      source: 'chatbot'
+    };
+
+    if (statusParam === 'pending') {
+      query.status = { $in: ['open', 'in-progress'] };
+    } else if (statusParam === 'answered') {
+      query.status = { $in: ['resolved', 'closed'] };
+    }
+
+    const tickets = await SupportTicket.find(query)
+      .populate('userId', 'firstName lastName studentId')
+      .populate('answeredBy', 'firstName lastName adminId')
+      .sort({ createdAt: -1, submittedAt: -1 });
+
+    res.json({
+      questions: tickets.map((ticket) => ({
+        id: ticket._id,
+        question: ticket.studentQuestion || ticket.description,
+        status: ticket.status,
+        submittedAt: ticket.createdAt || ticket.submittedAt,
+        student: ticket.userId
+          ? {
+            id: ticket.userId._id,
+            firstName: ticket.userId.firstName,
+            lastName: ticket.userId.lastName,
+            studentId: ticket.userId.studentId
+          }
+          : null,
+        adminAnswer: ticket.adminAnswer || '',
+        answeredAt: ticket.answeredAt,
+        answeredBy: ticket.answeredBy
+          ? {
+            id: ticket.answeredBy._id,
+            firstName: ticket.answeredBy.firstName,
+            lastName: ticket.answeredBy.lastName,
+            adminId: ticket.answeredBy.adminId
+          }
+          : null
+      }))
+    });
+  } catch (error) {
+    console.error('Admin chatbot questions error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch chatbot questions',
+      message: 'Server error'
+    });
+  }
+});
+
+router.patch('/chatbot-questions/:id/answer', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { answer } = req.body;
+
+    if (!answer || !String(answer).trim()) {
+      return res.status(400).json({
+        error: 'Answer is required'
+      });
+    }
+
+    const now = new Date();
+    const answerText = String(answer).trim();
+    const ticket = await SupportTicket.findOne({
+      _id: req.params.id,
+      source: 'chatbot'
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        error: 'Question not found'
+      });
+    }
+
+    ticket.status = 'resolved';
+    ticket.adminAnswer = answerText;
+    ticket.resolution = answerText;
+    ticket.answeredBy = req.userId;
+    ticket.answeredAt = now;
+    ticket.resolvedAt = now;
+    ticket.studentNotified = true;
+    ticket.studentRead = false;
+    ticket.messages = ticket.messages || [];
+    ticket.messages.push({
+      sender: req.userId,
+      message: answerText,
+      isInternal: false,
+      timestamp: now
+    });
+
+    await ticket.save();
+
+    res.json({
+      message: 'Answer published to student',
+      question: {
+        id: ticket._id,
+        status: ticket.status,
+        answer: ticket.adminAnswer,
+        answeredAt: ticket.answeredAt
+      }
+    });
+  } catch (error) {
+    console.error('Admin chatbot answer error:', error);
+    res.status(500).json({
+      error: 'Failed to publish answer',
+      message: 'Server error'
+    });
+  }
+});
+
+router.get('/chatbot-feedback-alerts', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const onlyAlerts = String(req.query.onlyAlerts || 'true') === 'true';
+    const query = onlyAlerts
+      ? { thumbsDownCount: { $gt: 5 } }
+      : {};
+
+    const summaries = await ChatFeedbackSummary.find(query)
+      .populate('alertTicketId', 'status createdAt submittedAt')
+      .sort({ thumbsDownCount: -1, updatedAt: -1 })
+      .limit(200);
+
+    res.json({
+      alerts: summaries.map((summary) => ({
+        id: summary._id,
+        normalizedQuestion: summary.normalizedQuestion,
+        sampleQuestion: summary.sampleQuestion,
+        sampleReply: summary.sampleReply,
+        thumbsUpCount: summary.thumbsUpCount,
+        thumbsDownCount: summary.thumbsDownCount,
+        alertSent: Boolean(summary.alertSent),
+        alertTicketId: summary.alertTicketId?._id || null,
+        alertTicketStatus: summary.alertTicketId?.status || null,
+        updatedAt: summary.updatedAt,
+        lastSeenAt: summary.lastSeenAt
+      }))
+    });
+  } catch (error) {
+    console.error('Admin chatbot feedback alerts error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch chatbot feedback alerts',
       message: 'Server error'
     });
   }

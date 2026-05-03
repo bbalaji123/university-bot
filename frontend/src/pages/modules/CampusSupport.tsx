@@ -163,7 +163,7 @@ const getTypeColor = (type: string) => {
 }
 
 const CampusSupport: React.FC = () => {
-  const apiBaseUrl = 'http://localhost:5000/api'
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
   const [selectedHostel, setSelectedHostel] = useState<Hostel | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<TransportRoute | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -959,3 +959,4 @@ const CampusSupport: React.FC = () => {
 }
 
 export default CampusSupport
+

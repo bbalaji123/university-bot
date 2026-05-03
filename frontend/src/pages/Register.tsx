@@ -1,86 +1,78 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  User,
-  Lock,
-  GraduationCap,
-  Eye,
-  EyeOff,
   AlertCircle,
+  BookOpen,
   CheckCircle,
+  GraduationCap,
+  Mail,
+  Phone,
   ShieldCheck,
-  BookOpen
+  User
 } from 'lucide-react'
 
 interface RegisterFormData {
-  firstName: string
-  lastName: string
-  password: string
-  confirmPassword: string
+  fullName: string
+  email: string
   studentId: string
-  program: string
   year: string
+  section: string
   gpa: string
+  mobileNumber: string
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
 const HERO_IMAGE = '/vignan-campus.png'
 
 const Register: React.FC = () => {
   const navigate = useNavigate()
   const [formData, setFormData] = useState<RegisterFormData>({
-    firstName: '',
-    lastName: '',
-    password: '',
-    confirmPassword: '',
+    fullName: '',
+    email: '',
     studentId: '',
-    program: '',
     year: '',
-    gpa: ''
+    section: '',
+    gpa: '',
+    mobileNumber: '',
   })
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  const programs = [
-    'Computer Science',
-    'Business Administration', 
-    'Engineering',
-    'Arts & Design',
-    'Science',
-    'Medicine',
-    'Law',
-    'Education'
-  ]
-
   const years = ['1', '2', '3', '4', '5', '6']
+  const sections = ['A', 'B', 'C', 'D']
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    setFormData((prev) => ({ ...prev, [name]: value }))
     setError('')
     setSuccess('')
   }
 
   const validateForm = () => {
-    if (!formData.firstName || !formData.lastName || !formData.password || !formData.confirmPassword || !formData.studentId || !formData.program || !formData.year) {
+    if (
+      !formData.fullName ||
+      !formData.studentId ||
+      !formData.year ||
+      !formData.section ||
+      !formData.mobileNumber
+    ) {
       setError('Please fill in all required fields')
       return false
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long')
+    if (!/^\d{10}$/.test(formData.mobileNumber)) {
+      setError('Mobile number must be exactly 10 digits')
       return false
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
+    if (!/^[A-Za-z0-9]{6,20}$/.test(formData.studentId)) {
+      setError('Registration number must be 6-20 alphanumeric characters')
       return false
     }
 
     if (formData.gpa && (parseFloat(formData.gpa) < 0 || parseFloat(formData.gpa) > 10.0)) {
-      setError('GPA must be between 0.0 and 10.0')
+      setError('CGPA must be between 0.0 and 10.0')
       return false
     }
 
@@ -89,7 +81,6 @@ const Register: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (!validateForm()) return
 
     setLoading(true)
@@ -97,20 +88,21 @@ const Register: React.FC = () => {
     setSuccess('')
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          password: formData.password,
+          fullName: formData.fullName,
+          email: formData.email || undefined,
+          password: formData.mobileNumber,
+          mobileNumber: formData.mobileNumber,
           studentId: formData.studentId,
-          program: formData.program,
           year: parseInt(formData.year),
-          gpa: formData.gpa ? parseFloat(formData.gpa) : undefined
-        })
+          section: formData.section,
+          gpa: formData.gpa ? parseFloat(formData.gpa) : undefined,
+        }),
       })
 
       const data = await response.json()
@@ -119,11 +111,11 @@ const Register: React.FC = () => {
         setSuccess('Account created successfully! Redirecting to login...')
         setTimeout(() => {
           navigate('/login')
-        }, 2000)
+        }, 1800)
       } else {
         setError(data.error || 'Registration failed. Please try again.')
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Please check your connection and try again.')
     } finally {
       setLoading(false)
@@ -141,9 +133,9 @@ const Register: React.FC = () => {
       <div className="absolute -bottom-32 right-10 h-96 w-96 rounded-full bg-rose-500/20 blur-3xl float-slow" />
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-12">
-        <div className="w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/10 bg-white/10 shadow-2xl backdrop-blur-xl auth-grid">
+        <div className="w-full max-w-[68.75rem] min-h-[560px] overflow-hidden rounded-[22px] border border-white/10 bg-white/10 shadow-2xl backdrop-blur-xl auth-grid">
           <div className="grid lg:grid-cols-2">
-            <div className="bg-slate-900/80 p-10 lg:p-12">
+            <div className="bg-slate-900/80 p-6 lg:p-7">
               <div className="fade-up">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] uppercase tracking-[0.2em] text-slate-200">
                   <span className="h-2 w-2 rounded-full bg-rose-400" />
@@ -154,43 +146,47 @@ const Register: React.FC = () => {
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white">
                     <GraduationCap className="h-6 w-6" />
                   </div>
-                  <span className="text-sm text-slate-300">Join the smart campus experience</span>
+                  <span className="text-sm text-slate-300">Secure student onboarding</span>
                 </div>
 
                 <h1 className="mt-6 text-4xl font-display leading-tight text-white">
-                  Create your
-                  <span className="block text-slate-300">student profile</span>
+                  AI Student Support
+                  <span className="block text-slate-300">System</span>
                 </h1>
                 <p className="mt-4 text-sm leading-relaxed text-slate-300">
-                  Unlock AI assistance, smart workflows, and centralized support with a single secure account.
+                  Create your student account to access admissions, academics, finance, campus services, and counseling support.
                 </p>
 
                 <div className="mt-8 grid gap-3">
                   <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
                     <div className="flex items-center gap-3">
                       <BookOpen className="h-4 w-4 text-cyan-300" />
-                      <p className="text-sm text-slate-200">Guided onboarding</p>
+                      <p className="text-sm text-slate-200">Registration-number workflow</p>
                     </div>
-                    <p className="mt-2 text-xs text-slate-400">Tell us your program details and we tailor the support modules.</p>
+                    <p className="mt-2 text-xs text-slate-400">Sign up with your registration number and use your mobile number to log in.</p>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
                     <div className="flex items-center gap-3">
                       <ShieldCheck className="h-4 w-4 text-rose-300" />
-                      <p className="text-sm text-slate-200">Secure data</p>
+                      <p className="text-sm text-slate-200">Protected portal access</p>
                     </div>
-                    <p className="mt-2 text-xs text-slate-400">Verified credentials with protected student records.</p>
+                    <p className="mt-2 text-xs text-slate-400">JWT secured sessions and encrypted student records.</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-slate-50 p-10 text-slate-900 lg:p-12">
+            <div className="bg-slate-50 p-6 text-slate-900 lg:p-7">
               <div className="fade-up">
-                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-rose-500">Student Registration</p>
-                <h2 className="mt-3 text-3xl font-display text-slate-900">Create your account</h2>
-                <p className="mt-2 text-sm text-slate-500">Fill in your student details to activate the portal.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-rose-500">
+                  Student Sign Up
+                </p>
+                <h2 className="mt-3 text-3xl font-display text-slate-900">Create account</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Use your student credentials. You can sign in with your registration number and mobile number.
+                </p>
 
-                <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+                <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
                   {error && (
                     <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
                       <AlertCircle className="h-5 w-5 text-rose-500" />
@@ -205,49 +201,46 @@ const Register: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label htmlFor="firstName" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        First Name
-                      </label>
-                      <div className="relative mt-2">
-                        <input
-                          id="firstName"
-                          name="firstName"
-                          type="text"
-                          required
-                          value={formData.firstName}
-                          onChange={handleInputChange}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pl-11 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                          placeholder="John"
-                        />
-                        <User className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
-                      </div>
+                  <div>
+                    <label htmlFor="fullName" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Full Name
+                    </label>
+                    <div className="relative mt-2">
+                      <input
+                        id="fullName"
+                        name="fullName"
+                        type="text"
+                        required
+                        value={formData.fullName}
+                        onChange={handleInputChange}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pl-11 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                        placeholder="John Doe"
+                      />
+                      <User className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
                     </div>
+                  </div>
 
-                    <div>
-                      <label htmlFor="lastName" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        Last Name
-                      </label>
-                      <div className="relative mt-2">
-                        <input
-                          id="lastName"
-                          name="lastName"
-                          type="text"
-                          required
-                          value={formData.lastName}
-                          onChange={handleInputChange}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pl-11 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                          placeholder="Doe"
-                        />
-                        <User className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
-                      </div>
+                  <div>
+                    <label htmlFor="email" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Email (Optional)
+                    </label>
+                    <div className="relative mt-2">
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pl-11 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                        placeholder="johndoe@example.com"
+                      />
+                      <Mail className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
                     </div>
                   </div>
 
                   <div>
                     <label htmlFor="studentId" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Student ID
+                      Registration Number
                     </label>
                     <div className="relative mt-2">
                       <input
@@ -258,32 +251,13 @@ const Register: React.FC = () => {
                         value={formData.studentId}
                         onChange={handleInputChange}
                         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pl-11 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                        placeholder="ST2024001"
+                        placeholder="231FA04860"
                       />
                       <GraduationCap className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
                     </div>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label htmlFor="program" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        Program
-                      </label>
-                      <select
-                        id="program"
-                        name="program"
-                        required
-                        value={formData.program}
-                        onChange={handleInputChange}
-                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                      >
-                        <option value="">Select Program</option>
-                        {programs.map(program => (
-                          <option key={program} value={program}>{program}</option>
-                        ))}
-                      </select>
-                    </div>
-
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <label htmlFor="year" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                         Year
@@ -293,12 +267,35 @@ const Register: React.FC = () => {
                         name="year"
                         required
                         value={formData.year}
-                        onChange={handleInputChange}
+                        onChange={(e) => setFormData(prev => ({ ...prev, year: e.target.value }))}
                         className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
                       >
                         <option value="">Select Year</option>
-                        {years.map(year => (
-                          <option key={year} value={year}>Year {year}</option>
+                        {years.map((year) => (
+                          <option key={year} value={year}>
+                            Year {year}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="section" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        Section
+                      </label>
+                      <select
+                        id="section"
+                        name="section"
+                        required
+                        value={formData.section}
+                        onChange={(e) => setFormData(prev => ({ ...prev, section: e.target.value }))}
+                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                      >
+                        <option value="">Select Section</option>
+                        {sections.map((section) => (
+                          <option key={section} value={section}>
+                            Section {section}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -306,7 +303,7 @@ const Register: React.FC = () => {
 
                   <div>
                     <label htmlFor="gpa" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Current GPA (Optional)
+                      CGPA (Optional)
                     </label>
                     <input
                       id="gpa"
@@ -315,59 +312,26 @@ const Register: React.FC = () => {
                       value={formData.gpa}
                       onChange={handleInputChange}
                       className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                      placeholder="3.5"
+                      placeholder="8.5"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Password
+                    <label htmlFor="mobileNumber" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Mobile Number (Used as Password)
                     </label>
                     <div className="relative mt-2">
                       <input
-                        id="password"
-                        name="password"
-                        type={showPassword ? 'text' : 'password'}
+                        id="mobileNumber"
+                        name="mobileNumber"
+                        type="text"
                         required
-                        value={formData.password}
+                        value={formData.mobileNumber}
                         onChange={handleInputChange}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pl-11 pr-11 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                        placeholder="••••••••"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pl-11 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                        placeholder="9876543210"
                       />
-                      <Lock className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-3.5 text-slate-400 transition hover:text-slate-600"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="confirmPassword" className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Confirm Password
-                    </label>
-                    <div className="relative mt-2">
-                      <input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        required
-                        value={formData.confirmPassword}
-                        onChange={handleInputChange}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pl-11 pr-11 text-sm text-slate-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                        placeholder="••••••••"
-                      />
-                      <Lock className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-4 top-3.5 text-slate-400 transition hover:text-slate-600"
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
+                      <Phone className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
                     </div>
                   </div>
 
@@ -376,7 +340,7 @@ const Register: React.FC = () => {
                     disabled={loading}
                     className="w-full rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-500/30 transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {loading ? 'Creating Account...' : 'Create Account'}
+                    {loading ? 'Creating account...' : 'Sign Up'}
                   </button>
 
                   <p className="text-center text-sm text-slate-500">
@@ -396,3 +360,4 @@ const Register: React.FC = () => {
 }
 
 export default Register
+

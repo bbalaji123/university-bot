@@ -9,6 +9,21 @@ const { User } = require('../models/User');
 
 const router = express.Router();
 
+const isProduction = process.env.NODE_ENV === 'production';
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+
+  if (secret) {
+    return secret;
+  }
+
+  if (isProduction) {
+    throw new Error('Missing required environment variable: JWT_SECRET');
+  }
+
+  return 'your-secret-key';
+};
+
 // ========================================
 // 🔐 HELPER FUNCTIONS
 // ========================================
@@ -17,7 +32,7 @@ const router = express.Router();
 const generateToken = (userId) => {
   return jwt.sign(
     { userId },
-    process.env.JWT_SECRET || 'your-secret-key',
+    getJwtSecret(),
     { expiresIn: '7d' } // Token expires in 7 days
   );
 };
@@ -34,7 +49,7 @@ const authenticateToken = (req, res, next) => {
     });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, decoded) => {
+  jwt.verify(token, getJwtSecret(), (err, decoded) => {
     if (err) {
       return res.status(403).json({ 
         error: 'Invalid token',
@@ -80,13 +95,46 @@ const requireAdmin = async (req, res, next) => {
 // ========================================
 
 const validateRegistration = (req, res, next) => {
-  const { firstName, lastName, password, studentId } = req.body;
+  const {
+    fullName,
+    firstName,
+    lastName,
+    password,
+    studentId,
+    year,
+    section,
+    gpa,
+    mobileNumber
+  } = req.body;
+  const resolvedFirstName = firstName || fullName?.trim().split(/\s+/)[0];
+  const resolvedLastName =
+    lastName ||
+    fullName?.trim().split(/\s+/).slice(1).join(' ') ||
+    'Student';
   
   // Basic validation
-  if (!firstName || !lastName || !password || !studentId) {
+  if (!resolvedFirstName || !resolvedLastName || !password || !studentId || !year || !section) {
     return res.status(400).json({
       error: 'All fields are required',
-      fields: ['firstName', 'lastName', 'password', 'studentId']
+      fields: ['fullName', 'studentId', 'year', 'section', 'mobileNumber']
+    });
+  }
+
+  if (mobileNumber && !/^\d{10}$/.test(mobileNumber)) {
+    return res.status(400).json({
+      error: 'Mobile number must be exactly 10 digits'
+    });
+  }
+
+  if (Number(year) < 1 || Number(year) > 6) {
+    return res.status(400).json({
+      error: 'Year must be between 1 and 6'
+    });
+  }
+
+  if (gpa !== undefined && gpa !== null && gpa !== '' && (Number(gpa) < 0 || Number(gpa) > 10)) {
+    return res.status(400).json({
+      error: 'CGPA must be between 0 and 10'
     });
   }
   
@@ -108,7 +156,24 @@ const validateRegistration = (req, res, next) => {
 // Register new student account
 router.post('/register', validateRegistration, async (req, res) => {
   try {
-    const { firstName, lastName, password, studentId, program } = req.body;
+    const {
+      fullName,
+      firstName,
+      lastName,
+      email,
+      password,
+      studentId,
+      program,
+      year,
+      section,
+      gpa,
+      mobileNumber
+    } = req.body;
+    const resolvedFirstName = firstName || fullName?.trim().split(/\s+/)[0];
+    const resolvedLastName =
+      lastName ||
+      fullName?.trim().split(/\s+/).slice(1).join(' ') ||
+      'Student';
     
     // Check if user already exists
     const existingUser = await User.findOne({
@@ -128,13 +193,16 @@ router.post('/register', validateRegistration, async (req, res) => {
     
     // Create new user
     const newUser = new User({
-      firstName,
-      lastName,
+      firstName: resolvedFirstName,
+      lastName: resolvedLastName,
+      email,
       password: hashedPassword,
       studentId,
       program: program || 'Computer Science',
-      year: 1,
-      gpa: 0.0
+      year: Number(year),
+      section: String(section).toUpperCase(),
+      gpa: gpa !== undefined && gpa !== null && gpa !== '' ? Number(gpa) : 0.0,
+      mobileNumber: mobileNumber || password
     });
     
     await newUser.save();
@@ -149,8 +217,13 @@ router.post('/register', validateRegistration, async (req, res) => {
         id: newUser._id,
         firstName: newUser.firstName,
         lastName: newUser.lastName,
+        email: newUser.email,
         studentId: newUser.studentId,
-        program: newUser.program
+        program: newUser.program,
+        year: newUser.year,
+        section: newUser.section,
+        gpa: newUser.gpa,
+        mobileNumber: newUser.mobileNumber
       }
     });
     
@@ -251,6 +324,66 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// POST /api/auth/forgot-password
+// Reset student password after validating student details
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { studentId, year, section, newPassword } = req.body;
+
+    if (!studentId || !year || !section || !newPassword) {
+      return res.status(400).json({
+        error: 'All fields are required',
+        fields: ['studentId', 'year', 'section', 'newPassword']
+      });
+    }
+
+    if (Number(year) < 1 || Number(year) > 6) {
+      return res.status(400).json({
+        error: 'Year must be between 1 and 6'
+      });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({
+        error: 'Password must be at least 6 characters'
+      });
+    }
+
+    const user = await User.findOne({ studentId, role: 'student' });
+    if (!user) {
+      return res.status(404).json({
+        error: 'Student not found'
+      });
+    }
+
+    const isYearMatch = Number(user.year) === Number(year);
+    const isSectionMatch = String(user.section || '').toUpperCase() === String(section).toUpperCase();
+
+    if (!isYearMatch || !isSectionMatch) {
+      return res.status(401).json({
+        error: 'Verification failed',
+        message: 'Student details do not match our records'
+      });
+    }
+
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(String(newPassword), saltRounds);
+    user.password = hashedPassword;
+    user.updatedAt = new Date();
+    await user.save();
+
+    res.json({
+      message: 'Password reset successful. Please login with your new password.'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      error: 'Password reset failed',
+      message: 'Server error during password reset'
+    });
+  }
+});
+
 // GET /api/auth/profile
 // Get authenticated user profile
 router.get('/profile', authenticateToken, async (req, res) => {
@@ -268,6 +401,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
+        email: user.email,
         studentId: user.studentId,
         program: user.program,
         year: user.year,
@@ -294,7 +428,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
     const updates = req.body;
-    const allowedUpdates = ['firstName', 'lastName', 'language', 'theme', 'socialProfiles'];
+    const allowedUpdates = ['firstName', 'lastName', 'email', 'language', 'theme', 'socialProfiles'];
     
     // Filter only allowed fields
     const filteredUpdates = {};
@@ -322,6 +456,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
         id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
+        email: user.email,
         studentId: user.studentId,
         program: user.program,
         year: user.year,

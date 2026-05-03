@@ -1,0 +1,16 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sentence-transformers==3.3.1
+faiss-cpu==1.9.0.post1
+numpy==1.26.4
+transformers==4.47.1
+sentencepiece==0.2.0
+torch==2.5.1
+langdetect==1.0.9
+pyttsx3==2.98
+python-multipart==0.0.20
+vosk==0.3.45
+python-telegram-bot==21.9
+requests==2.32.3
+deep-translator==1.11.4
+gTTS==2.5.4

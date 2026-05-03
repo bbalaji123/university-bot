@@ -10,6 +10,21 @@ const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
+const isProduction = process.env.NODE_ENV === 'production';
+const requireEnv = (name, fallback = null) => {
+  const value = process.env[name];
+
+  if (value) {
+    return value;
+  }
+
+  if (isProduction) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return fallback;
+};
+
 // Import Routes for Data Storage
 const { router: authRouter, authenticateToken } = require('./routes/auth');
 const chatRouter = require('./routes/chat');
@@ -36,9 +51,13 @@ app.use(helmet());
 // CORS: Cross-Origin Resource Sharing
 // Allows frontend (React app) to communicate with backend
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
+  requireEnv('FRONTEND_URL'),
   'http://localhost:3000',
-  'http://localhost:5173'
+  'http://127.0.0.1:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
 ].filter(Boolean);
 
 app.use(cors({
@@ -60,7 +79,6 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 const ensureAdminUser = async () => {
-  const isProduction = process.env.NODE_ENV === 'production';
   const adminId = process.env.ADMIN_ID || (!isProduction ? 'ADMIN01' : null);
   const adminPassword = process.env.ADMIN_PASSWORD || (!isProduction ? 'Admin@123' : null);
 
@@ -106,14 +124,15 @@ const ensureAdminUser = async () => {
 
 // MongoDB Connection using Mongoose
 // Mongoose provides schema validation, middleware, etc.
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/student-support', {
+const mongoUri = requireEnv('MONGODB_URI', 'mongodb://localhost:27017/student-support');
+mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
 .then(() => {
   console.log('✅ MongoDB connected successfully');
   ensureAdminUser();
-})
+}) 
 .catch((err) => {
   console.error('❌ MongoDB connection error:', err);
   process.exit(1);
@@ -127,6 +146,8 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  console.log(`🗄️ MongoDB URI: ${isProduction ? 'configured' : mongoUri}`);
 });
 
 // ========================================

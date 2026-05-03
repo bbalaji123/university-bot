@@ -135,7 +135,7 @@ const getEventTypeColor = (type: string) => {
 }
 
 const AcademicSupport: React.FC = () => {
-  const apiBaseUrl = 'http://localhost:5000/api'
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [courseStatusFilter, setCourseStatusFilter] = useState<'all' | 'available' | 'full' | 'prerequisite'>('all')
@@ -747,3 +747,4 @@ const AcademicSupport: React.FC = () => {
 }
 
 export default AcademicSupport
+

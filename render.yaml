@@ -31,6 +31,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
+    pythonVersion: 3.10.14
     envVars:
       - key: RAG_CONFIDENCE_THRESHOLD
         value: 0.45

@@ -563,14 +563,37 @@ class ChatEngine:
     )
 
     def __init__(self) -> None:
+        lightweight_mode = os.getenv("AI_LIGHTWEIGHT_MODE", "0").lower() in {"1", "true", "yes", "on"}
+        self.lightweight_mode = lightweight_mode
         self.search = SemanticSearchEngine(
             dataset_path=str(DATASET_PATH),
-            embedding_model=get_embedding_model(),
+            embedding_model=None if lightweight_mode else get_embedding_model(),
             confidence_threshold=CONFIDENCE_THRESHOLD,
+            lightweight=lightweight_mode,
         )
         self.known_query_terms = set(self.KNOWN_QUERY_TERMS)
-        self.known_query_terms.update(self._build_dataset_vocabulary())
-        self.suggestion_phrases = self._build_suggestion_phrases()
+        if not self.lightweight_mode:
+            self.known_query_terms.update(self._build_dataset_vocabulary())
+            self.suggestion_phrases = self._build_suggestion_phrases()
+        else:
+            self.suggestion_phrases = [
+                "vignan university",
+                "fees",
+                "hostel fee",
+                "tuition fee",
+                "admission fee",
+                "scholarship",
+                "scholarship eligibility",
+                "how to apply scholarship",
+                "credits",
+                "course credits",
+                "add on credits",
+                "admission process",
+                "hostel facilities",
+                "placement training",
+                "transport routes",
+                "library timings",
+            ]
         self.translation = get_translation_service()
         self.sentiment = get_sentiment_service()
         self.speech = get_speech_service(os.getenv("VOSK_MODEL_PATH"))

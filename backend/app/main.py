@@ -1189,6 +1189,16 @@ def startup_event() -> None:
         raise RuntimeError(f"Failed to initialize chatbot service: {startup_error}") from startup_error
 
 
+@app.get("/")
+def root() -> dict:
+    return {
+        "status": "ok",
+        "service": "university-ai-api",
+        "health": "/health",
+        "chat": "/chat",
+    }
+
+
 @app.get("/health")
 def health() -> dict:
     engine: ChatEngine = app.state.engine
